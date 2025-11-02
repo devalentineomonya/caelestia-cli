@@ -41,6 +41,14 @@ class Command:
         self.args = args
 
     def run(self) -> None:
+        if hasattr(self.args, "status") and self.args.status:
+            self.status()
+        elif hasattr(self.args, "stop") and self.args.stop:
+            self.stop()
+        elif self.args.pause:
+            subprocess.run(
+                ["pkill", "-USR2", "-f", RECORDER], stdout=subprocess.DEVNULL
+            )
         if getattr(self.args, "status", False):
             self.status()
         elif getattr(self.args, "stop", False):
@@ -77,52 +85,54 @@ class Command:
             and a[1] + a[3] > b[1]
         )
 
-    def get_audio_device(self, audio_mode: str | None) -> str:
-        """Return the audio device string for the given mode, with fallback handling.
-
-        Returns an empty string when no audio should be recorded.
-        """
-        if not audio_mode or audio_mode == "none":
+    def get_audio_device(self, audio_mode: str) -> str:
+        """Get the appropriate audio device for the given mode with fallback handling."""
+        if audio_mode == "none" or not audio_mode:
             return ""
 
         device = AUDIO_MODES.get(audio_mode, "")
 
-        try:
-            result = subprocess.run(
-                ["pactl", "list", "sources", "short"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            available_devices = [
-                line.split("\t")[1]
-                for line in result.stdout.strip().split("\n")
-                if line
-            ]
-
-            # Symbolic defaults are PipeWire aliases — skip the availability
-            # check for them since they'll never appear in the source list.
-            if device and device not in SYMBOLIC_DEFAULTS and device not in available_devices:
-                print(
-                    f"Warning: audio device '{device}' not available, falling back to default"
+        # Check if the device is available
+        if audio_mode in ["mic", "system", "combined"]:
+            try:
+                result = subprocess.run(
+                    ["pactl", "list", "sources", "short"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
                 )
+                available_devices = [
+                    line.split("\t")[1]
+                    for line in result.stdout.strip().split("\n")
+                    if line
+                ]
+                if device and device not in available_devices:
+                    print(
+                        f"Warning: Audio device '{device}' not available, falling back to default"
+                    )
+
                 if audio_mode == "mic":
-                    candidates = [
-                        d for d in available_devices
+                    input_devices = [
+                        d
+                        for d in available_devices
                         if "input" in d.lower() or "mic" in d.lower()
                     ]
-                    device = candidates[0] if candidates else ""
+                    device = input_devices[0] if input_devices else ""
                 elif audio_mode == "system":
-                    candidates = [
-                        d for d in available_devices
+                    output_devices = [
+                        d
+                        for d in available_devices
                         if "output" in d.lower() or "monitor" in d.lower()
                     ]
-                    device = candidates[0] if candidates else ""
-
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            print("Warning: could not check audio devices, audio recording may fail")
+                    device = output_devices[0] if output_devices else ""
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                print(
+                    "Warning: Could not check audio devices, audio recording may fail"
+                )
+                device = ""
 
         return device
+
 
     def get_window_region(self) -> str | None:
         """Select a window via slurp and return its region string."""
@@ -173,19 +183,19 @@ class Command:
             ):
                 max_rr = max(max_rr, round(monitor["refreshRate"]))
         return max_rr
-
     def start(self) -> None:
         args = ["-w"]
 
+        # Get video mode and audio mode from args
         video_mode = getattr(self.args, "mode", "fullscreen")
-        audio_mode = getattr(self.args, "audio", None)
+        audio_mode = getattr(self.args, "audio", "none")
 
         monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"]))
 
-        # --- Video mode ---
+        # Handle video modes
         if video_mode == "region" or self.args.region:
             if self.args.region == "slurp" or not self.args.region:
-                region_str = subprocess.check_output(
+                region = subprocess.check_output(
                     ["slurp", "-f", "%wx%h+%x+%y"], text=True
                 ).strip()
             else:
@@ -210,34 +220,31 @@ class Command:
             if focused:
                 args += [focused["name"], "-f", str(round(focused["refreshRate"]))]
 
-        # --- Audio mode ---
+        # Handle audio modes
         audio_device = self.get_audio_device(audio_mode)
         if audio_device:
             args += ["-a", audio_device, "-ac", "opus", "-ab", "192k"]
             print(f"Recording with audio: {audio_device} ({audio_mode})")
-        elif getattr(self.args, "sound", False):
-            args += ["-a", "default_output"]
         else:
             print("Recording without audio")
 
         config = get_config()
+        # Load extra args from config
         try:
-            config = json.loads(user_config_path.read_text())
-            extra = config.get("record", {}).get("extraArgs", [])
-            if not isinstance(extra, list):
-                raise ValueError("Config option 'record.extraArgs' must be an array")
-            args += extra
-        except (json.JSONDecodeError, FileNotFoundError):
-            pass
+            if "record" in config and "extraArgs" in config["record"]:
+                args += config["record"]["extraArgs"]
+        except TypeError as e:
+            raise ValueError(
+                f"Config option 'record.extraArgs' should be an array: {e}"
+            )
 
-        # --- Launch recorder ---
         recording_path.parent.mkdir(parents=True, exist_ok=True)
         proc = subprocess.Popen(
             [RECORDER, *args, "-o", str(recording_path)], start_new_session=True
         )
 
-        audio_label = audio_mode if audio_device else "no audio"
-        mode_text = f"{video_mode} with {audio_label}"
+        # Show notification with mode info
+        mode_text = f"{video_mode} with {audio_mode if audio_device else 'no'} audio"
         notif = notify("-p", "Recording started", f"Recording {mode_text}...")
         recording_notif_path.write_text(notif)
 
@@ -247,7 +254,7 @@ class Command:
                 notify(
                     "Recording failed",
                     "An error occurred attempting to start recorder. "
-                    f"Command `{' '.join(proc.args)}` failed with exit code {proc.returncode}",
+                    f"Command {' '.join(proc.args)} failed with exit code {proc.returncode}",
                 )
         except subprocess.TimeoutExpired:
             pass  # Still running — good
@@ -344,3 +351,22 @@ class Command:
                 subprocess.Popen(["xdg-open", new_path.parent], start_new_session=True)
         elif action == "delete":
             new_path.unlink()
+        # Show completion notification in background (non-blocking)
+        try:
+            subprocess.Popen(
+                [
+                    "notify-send",
+                    "-a",
+                    "caelestia-cli",
+                    "--action=watch=Watch",
+                    "--action=open=Open",
+                    "--action=delete=Delete",
+                    "Recording stopped",
+                    f"Recording saved in {new_path}",
+                ],
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception as e:
+            print(f"Could not show notification: {e}")
