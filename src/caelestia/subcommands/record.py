@@ -106,25 +106,25 @@ class Command:
                     for line in result.stdout.strip().split("\n")
                     if line
                 ]
+
                 if device and device not in available_devices:
                     print(
                         f"Warning: Audio device '{device}' not available, falling back to default"
                     )
-
-                if audio_mode == "mic":
-                    input_devices = [
-                        d
-                        for d in available_devices
-                        if "input" in d.lower() or "mic" in d.lower()
-                    ]
-                    device = input_devices[0] if input_devices else ""
-                elif audio_mode == "system":
-                    output_devices = [
-                        d
-                        for d in available_devices
-                        if "output" in d.lower() or "monitor" in d.lower()
-                    ]
-                    device = output_devices[0] if output_devices else ""
+                    if audio_mode == "mic":
+                        input_devices = [
+                            d
+                            for d in available_devices
+                            if "input" in d.lower() or "mic" in d.lower()
+                        ]
+                        device = input_devices[0] if input_devices else ""
+                    elif audio_mode == "system":
+                        output_devices = [
+                            d
+                            for d in available_devices
+                            if "output" in d.lower() or "monitor" in d.lower()
+                        ]
+                        device = output_devices[0] if output_devices else ""
             except (subprocess.CalledProcessError, FileNotFoundError):
                 print(
                     "Warning: Could not check audio devices, audio recording may fail"
@@ -225,6 +225,8 @@ class Command:
         if audio_device:
             args += ["-a", audio_device, "-ac", "opus", "-ab", "192k"]
             print(f"Recording with audio: {audio_device} ({audio_mode})")
+        elif self.args.sound:  # Legacy support for --sound flag
+            args += ["-a", "default_output"]
         else:
             print("Recording without audio")
 
@@ -254,7 +256,7 @@ class Command:
                 notify(
                     "Recording failed",
                     "An error occurred attempting to start recorder. "
-                    f"Command {' '.join(proc.args)} failed with exit code {proc.returncode}",
+                    f"Command `{' '.join(proc.args)}` failed with exit code {proc.returncode}",
                 )
         except subprocess.TimeoutExpired:
             pass  # Still running — good
