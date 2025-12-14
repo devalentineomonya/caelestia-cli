@@ -130,6 +130,42 @@ class Command:
                     "Warning: Could not check audio devices, audio recording may fail"
                 )
                 device = ""
+        try:
+            result = subprocess.run(
+                ["pactl", "list", "sources", "short"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            available_devices = [
+                line.split("\t")[1]
+                for line in result.stdout.strip().split("\n")
+                if line
+            ]
+
+                if device and device not in available_devices:
+                    print(
+                        f"Warning: Audio device '{device}' not available, falling back to default"
+                    )
+                    if audio_mode == "mic":
+                        input_devices = [
+                            d
+                            for d in available_devices
+                            if "input" in d.lower() or "mic" in d.lower()
+                        ]
+                        device = input_devices[0] if input_devices else ""
+                    elif audio_mode == "system":
+                        output_devices = [
+                            d
+                            for d in available_devices
+                            if "output" in d.lower() or "monitor" in d.lower()
+                        ]
+                        device = output_devices[0] if output_devices else ""
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                print(
+                    "Warning: Could not check audio devices, audio recording may fail"
+                )
+                device = ""
 
         return device
 
@@ -361,7 +397,25 @@ class Command:
                 args += ["-f", str(max_rr)]
             except subprocess.CalledProcessError:
                 print("Window selection canceled")
+            window_info = self.get_window_region()
+            if not window_info:
+                print("Window selection cancelled")
                 return
+
+        else:  # fullscreen
+            focused_monitor = next(
+                (monitor for monitor in monitors if monitor["focused"]), None
+            )
+            if focused_monitor:
+                args += [
+                    focused_monitor["name"],
+                    "-f",
+                    str(round(focused_monitor["refreshRate"])),
+                ]
+
+            x, y, w, h = self._parse_region(window_info)
+            max_rr = self._max_refresh_rate_for_region(monitors, (x, y, w, h))
+            args += ["region", "-region", window_info, "-f", str(max_rr)]
 
         else:  # fullscreen
             focu = next((monitor for monitor in monitors if monitor["focused"]), None)
@@ -412,7 +466,7 @@ class Command:
                 notify(
                     "Recording failed",
                     "An error occurred attempting to start recorder. "
-                    f"Command `{ ' '.join(map(str, proc.args)) }` failed with exit code {proc.returncode}",
+                    f"Command `{' '.join(proc.args)}` failed with exit code {proc.returncode}",
                 )
         except subprocess.TimeoutExpired:
             pass
