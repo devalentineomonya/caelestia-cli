@@ -184,83 +184,236 @@ class Command:
                 max_rr = max(max_rr, round(monitor["refreshRate"]))
         return max_rr
     def start(self) -> None:
-        args = ["-w"]
+            args = ["-w"]
+            # Get video mode and audio mode from args
+            video_mode = getattr(self.args, "mode", "fullscreen")
+            audio_mode = getattr(self.args, "audio", "none")
+            monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"]))
+            # Handle video modes
+            if video_mode == "region" or self.args.region:
+                if self.args.region == "slurp" or not self.args.region:
+                    region = subprocess.check_output(
+                        ["slurp", "-f", "%wx%h+%x+%y"], text=True
+                    ).strip()
+                else:
+                    region = self.args.region.strip()
+                args += ["region", "-region", region]
+                m = re.match(r"(\d+)x(\d+)\+(\d+)\+(\d+)", region)
+                if not m:
+                    raise ValueError(f"Invalid region: {region}")
+                w, h, x, y = map(int, m.groups())
+                r = x, y, w, h
+                max_rr = 0
+                for monitor in monitors:
+                    if self.intersects(
+                        (monitor["x"], monitor["y"], monitor["width"], monitor["height"]), r
+                    ):
+                        rr = round(monitor["refreshRate"])
+                        max_rr = max(max_rr, rr)
+                args += ["-f", str(max_rr)]
+            elif video_mode == "window":
+                try:
+                    # Get active window info from Hyprland
+                    active_window = json.loads(
+                        subprocess.check_output(["hyprctl", "activewindow", "-j"])
+                    )
 
-        # Get video mode and audio mode from args
-        video_mode = getattr(self.args, "mode", "fullscreen")
-        audio_mode = getattr(self.args, "audio", "none")
+                    # Extract window geometry
+                    x = active_window["at"][0]
+                    y = active_window["at"][1]
+                    w = active_window["size"][0]
+                    h = active_window["size"][1]
 
-        monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"]))
+                    window_region = f"{w}x{h}+{x}+{y}"
+                    args += ["region", "-region", window_region]
 
-        # Handle video modes
-        if video_mode == "region" or self.args.region:
-            if self.args.region == "slurp" or not self.args.region:
-                region = subprocess.check_output(
-                    ["slurp", "-f", "%wx%h+%x+%y"], text=True
-                ).strip()
+                    # Calculate max refresh rate for the window region
+                    r = x, y, w, h
+                    max_rr = 0
+                    for monitor in monitors:
+                        if self.intersects(
+                            (
+                                monitor["x"],
+                                monitor["y"],
+                                monitor["width"],
+                                monitor["height"],
+                            ),
+                            r,
+                        ):
+                            rr = round(monitor["refreshRate"])
+                            max_rr = max(max_rr, rr)
+                    args += ["-f", str(max_rr)]
+                except subprocess.CalledProcessError as e:
+                    print(f"Window selection failed: {e}")
+                    return
+                except (KeyError, json.JSONDecodeError) as e:
+                    print(f"Could not parse window info: {e}")
+                    return
+            else:  # fullscreen
+                focused = next(
+                    (monitor for monitor in monitors if monitor["focused"]), None
+                )
+                if focused:
+                    args += [
+                        focused["name"],
+                        "-f",
+                        str(round(focused["refreshRate"])),
+                    ]
+            # Handle audio modes
+            audio_device = self.get_audio_device(audio_mode)
+            if audio_device:
+                args += ["-a", audio_device, "-ac", "opus", "-ab", "192k"]
+                print(f"Recording with audio: {audio_device} ({audio_mode})")
+            elif hasattr(self.args, "sound") and self.args.sound:  # Legacy support for --sound flag
+                args += ["-a", "default_output"]
             else:
-                region_str = self.args.region.strip()
+                print("Recording without audio")
+            # Load extra args from config
+            try:
+                config = json.loads(user_config_path.read_text())
+                if "record" in config and "extraArgs" in config["record"]:
+                    args += config["record"]["extraArgs"]
+            except (json.JSONDecodeError, FileNotFoundError):
+                pass
+            except TypeError as e:
+                raise ValueError(
+                    f"Config option 'record.extraArgs' should be an array: {e}"
+                )
+            recording_path.parent.mkdir(parents=True, exist_ok=True)
+            proc = subprocess.Popen(
+                [RECORDER, *args, "-o", str(recording_path)], start_new_session=True
+            )
+            # Show notification with mode info
+            mode_text = f"{video_mode} with {audio_mode if audio_device else 'no'} audio"
+            notif = notify("-p", "Recording started", f"Recording {mode_text}...")
+            recording_notif_path.write_text(notif)
+            try:
+                if proc.wait(1) != 0:
+                    close_notification(notif)
+                    notify(
+                        "Recording failed",
+                        "An error occurred attempting to start recorder. "
+                        f"Command `{' '.join(proc.args)}` failed with exit code {proc.returncode}",
+                    )
+            except subprocess.TimeoutExpired:
+                pass
+            args = ["-w"]
 
-            x, y, w, h = self._parse_region(region_str)
-            max_rr = self._max_refresh_rate_for_region(monitors, (x, y, w, h))
-            args += ["region", "-region", region_str, "-f", str(max_rr)]
+            # Get video mode and audio mode from args
+            video_mode = getattr(self.args, "mode", "fullscreen")
+            audio_mode = getattr(self.args, "audio", "none")
 
-        elif video_mode == "window":
-            window_info = self.get_window_region()
-            if not window_info:
-                print("Window selection cancelled")
-                return
+            monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"]))
 
-            x, y, w, h = self._parse_region(window_info)
-            max_rr = self._max_refresh_rate_for_region(monitors, (x, y, w, h))
-            args += ["region", "-region", window_info, "-f", str(max_rr)]
+            # Handle video modes
+            if video_mode == "region" or self.args.region:
+                if self.args.region == "slurp" or not self.args.region:
+                    region = subprocess.check_output(
+                        ["slurp", "-f", "%wx%h+%x+%y"], text=True
+                    ).strip()
+                else:
+                    region = self.args.region.strip()
+                args += ["region", "-region", region]
 
-        else:  # fullscreen
-            focused = next((m for m in monitors if m["focused"]), None)
-            if focused:
-                args += [focused["name"], "-f", str(round(focused["refreshRate"]))]
+                m = re.match(r"(\d+)x(\d+)\+(\d+)\+(\d+)", region)
+                if not m:
+                    raise ValueError(f"Invalid region: {region}")
 
-        # Handle audio modes
-        audio_device = self.get_audio_device(audio_mode)
-        if audio_device:
-            args += ["-a", audio_device, "-ac", "opus", "-ab", "192k"]
-            print(f"Recording with audio: {audio_device} ({audio_mode})")
-        elif self.args.sound:  # Legacy support for --sound flag
-            args += ["-a", "default_output"]
-        else:
-            print("Recording without audio")
+                w, h, x, y = map(int, m.groups())
+                r = x, y, w, h
+                max_rr = 0
+                for monitor in monitors:
+                    if self.intersects(
+                        (monitor["x"], monitor["y"], monitor["width"], monitor["height"]), r
+                    ):
+                        rr = round(monitor["refreshRate"])
+                        max_rr = max(max_rr, rr)
+                args += ["-f", str(max_rr)]
 
-        config = get_config()
-        # Load extra args from config
-        try:
-            if "record" in config and "extraArgs" in config["record"]:
-                args += config["record"]["extraArgs"]
-        except TypeError as e:
-            raise ValueError(
-                f"Config option 'record.extraArgs' should be an array: {e}"
+            elif video_mode == "window":
+                try:
+                    window_info = subprocess.check_output(
+                        ["slurp", "-w", "-f", "%wx%h+%x+%y"], text=True
+                    ).strip()
+                    args += ["region", "-region", window_info]
+
+                    m = re.match(r"(\d+)x(\d+)\+(\d+)\+(\d+)", window_info)
+                    if not m:
+                        raise ValueError(f"Invalid window region: {window_info}")
+
+                    w, h, x, y = map(int, m.groups())
+                    r = x, y, w, h
+                    max_rr = 0
+                    for monitor in monitors:
+                        if self.intersects(
+                            (
+                                monitor["x"],
+                                monitor["y"],
+                                monitor["width"],
+                                monitor["height"],
+                            ),
+                            r,
+                        ):
+                            rr = round(monitor["refreshRate"])
+                            max_rr = max(max_rr, rr)
+                    args += ["-f", str(max_rr)]
+                except subprocess.CalledProcessError:
+                    print("Window selection canceled")
+                    return
+
+            else:  # fullscreen
+                focu = next(
+                    (monitor for monitor in monitors if monitor["focused"]), None
+                )
+                if focu:
+                    args += [
+                        focu["name"],
+                        "-f",
+                        str(round(focu["refreshRate"])),
+                    ]
+
+            # Handle audio modes
+            audio_device = self.get_audio_device(audio_mode)
+            if audio_device:
+                args += ["-a", audio_device, "-ac", "opus", "-ab", "192k"]
+                print(f"Recording with audio: {audio_device} ({audio_mode})")
+            elif hasattr(self.args, "sound") and self.args.sound:  # Legacy support for --sound flag
+                args += ["-a", "default_output"]
+            else:
+                print("Recording without audio")
+
+            # Load extra args from config
+            try:
+                config = json.loads(user_config_path.read_text())
+                if "record" in config and "extraArgs" in config["record"]:
+                    args += config["record"]["extraArgs"]
+            except (json.JSONDecodeError, FileNotFoundError):
+                pass
+            except TypeError as e:
+                raise ValueError(
+                    f"Config option 'record.extraArgs' should be an array: {e}"
+                )
+
+            recording_path.parent.mkdir(parents=True, exist_ok=True)
+            proc = subprocess.Popen(
+                [RECORDER, *args, "-o", str(recording_path)], start_new_session=True
             )
 
-        recording_path.parent.mkdir(parents=True, exist_ok=True)
-        proc = subprocess.Popen(
-            [RECORDER, *args, "-o", str(recording_path)], start_new_session=True
-        )
+            # Show notification with mode info
+            mode_text = f"{video_mode} with {audio_mode if audio_device else 'no'} audio"
+            notif = notify("-p", "Recording started", f"Recording {mode_text}...")
+            recording_notif_path.write_text(notif)
 
-        # Show notification with mode info
-        mode_text = f"{video_mode} with {audio_mode if audio_device else 'no'} audio"
-        notif = notify("-p", "Recording started", f"Recording {mode_text}...")
-        recording_notif_path.write_text(notif)
-
-        try:
-            if proc.wait(1) != 0:
-                close_notification(notif)
-                notify(
-                    "Recording failed",
-                    "An error occurred attempting to start recorder. "
-                    f"Command `{' '.join(proc.args)}` failed with exit code {proc.returncode}",
-                )
-        except subprocess.TimeoutExpired:
-            pass  # Still running — good
-
+            try:
+                if proc.wait(1) != 0:
+                    close_notification(notif)
+                    notify(
+                        "Recording failed",
+                        "An error occurred attempting to start recorder. "
+                        f"Command `{' '.join(proc.args)}` failed with exit code {proc.returncode}",
+                    )
+            except subprocess.TimeoutExpired:
+                pass
     def stop(self) -> None:
         subprocess.run(["pkill", "-f", RECORDER], stdout=subprocess.DEVNULL)
 
