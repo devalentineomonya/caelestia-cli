@@ -341,7 +341,7 @@ class Command:
         video_mode = getattr(self.args, "mode", "fullscreen")
         audio_mode = getattr(self.args, "audio", "none")
 
-        monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"]))
+            monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"]))
 
         # Handle video modes
         if video_mode == "region" or self.args.region:
@@ -353,9 +353,9 @@ class Command:
                 region = self.args.region.strip()
             args += ["region", "-region", region]
 
-            m = re.match(r"(\d+)x(\d+)\+(\d+)\+(\d+)", region)
-            if not m:
-                raise ValueError(f"Invalid region: {region}")
+                m = re.match(r"(\d+)x(\d+)\+(\d+)\+(\d+)", region)
+                if not m:
+                    raise ValueError(f"Invalid region: {region}")
 
             w, h, x, y = map(int, m.groups())
             r = x, y, w, h
@@ -368,16 +368,16 @@ class Command:
                     max_rr = max(max_rr, rr)
             args += ["-f", str(max_rr)]
 
-        elif video_mode == "window":
-            try:
-                window_info = subprocess.check_output(
-                    ["slurp", "-w", "-f", "%wx%h+%x+%y"], text=True
-                ).strip()
-                args += ["region", "-region", window_info]
+            elif video_mode == "window":
+                try:
+                    window_info = subprocess.check_output(
+                        ["slurp", "-w", "-f", "%wx%h+%x+%y"], text=True
+                    ).strip()
+                    args += ["region", "-region", window_info]
 
-                m = re.match(r"(\d+)x(\d+)\+(\d+)\+(\d+)", window_info)
-                if not m:
-                    raise ValueError(f"Invalid window region: {window_info}")
+                    m = re.match(r"(\d+)x(\d+)\+(\d+)\+(\d+)", window_info)
+                    if not m:
+                        raise ValueError(f"Invalid window region: {window_info}")
 
                 w, h, x, y = map(int, m.groups())
                 r = x, y, w, h
@@ -402,16 +402,16 @@ class Command:
                 print("Window selection cancelled")
                 return
 
-        else:  # fullscreen
-            focused_monitor = next(
-                (monitor for monitor in monitors if monitor["focused"]), None
-            )
-            if focused_monitor:
-                args += [
-                    focused_monitor["name"],
-                    "-f",
-                    str(round(focused_monitor["refreshRate"])),
-                ]
+            else:  # fullscreen
+                focused_monitor = next(
+                    (monitor for monitor in monitors if monitor["focused"]), None
+                )
+                if focused_monitor:
+                    args += [
+                        focused_monitor["name"],
+                        "-f",
+                        str(round(focused_monitor["refreshRate"])),
+                    ]
 
             x, y, w, h = self._parse_region(window_info)
             max_rr = self._max_refresh_rate_for_region(monitors, (x, y, w, h))
