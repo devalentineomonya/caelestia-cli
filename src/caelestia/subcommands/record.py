@@ -1,3 +1,4 @@
+from pathlib import Path
 import json
 import re
 import shutil
@@ -506,6 +507,7 @@ class Command:
                 subprocess.Popen(["xdg-open", new_path.parent], start_new_session=True)
         elif action == "delete":
             new_path.unlink()
+
         # Show completion notification in background (non-blocking)
         try:
             subprocess.Popen(
