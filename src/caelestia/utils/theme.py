@@ -168,6 +168,12 @@ def apply_pandora(colours: dict[str, str], mode: str) -> None:
     template = template.replace("{{ $mode }}", mode)
     atomic_write(data_dir / "PandoraLauncher/themes/caelestia.json", template)
 
+@log_exception
+def apply_pandora(colours: dict[str, str], mode: str) -> None:
+    template = gen_replace(colours, templates_dir / "pandora.json", hash=True)
+    template = template.replace("{{ $mode }}", mode)
+    write_file(data_dir / "PandoraLauncher/themes/caelestia.json", template)
+
 
 @log_exception
 def apply_spicetify(colours: dict[str, str], mode: str) -> None:
