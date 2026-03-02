@@ -25,6 +25,11 @@ try:
 except ImportError:
     from materialyoucolor.scheme.dynamic_scheme import DynamicScheme
 
+try:
+    from materialyoucolor.dynamiccolor.dynamic_scheme import DynamicScheme
+except ImportError:
+    from materialyoucolor.scheme.dynamic_scheme import DynamicScheme
+
 
 def hex_to_hct(hex: str) -> Hct:
     return Hct.from_int(int(f"0xFF{hex}", 16))
