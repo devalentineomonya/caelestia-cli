@@ -122,6 +122,7 @@ def gen_sequences(colours: dict[str, str]) -> str:
     )
 
 
+
 @log_exception
 def apply_terms(sequences: str) -> None:
     state = c_state_dir / "sequences.txt"
