@@ -324,6 +324,8 @@ def apply_gtk(colours: dict[str, str], mode: str, icon_theme: str | None = None)
 
     subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/gtk-theme", "'adw-gtk3-dark'"])
     subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/color-scheme", f"'prefer-{mode}'"])
+    subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/icon-theme", f"'Papirus-{mode.capitalize()}'"])
+
     gtk_icon_theme = icon_theme if icon_theme is not None else f"Papirus-{mode.capitalize()}"
     subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/icon-theme", f"'{gtk_icon_theme}'"])
 
@@ -426,6 +428,11 @@ def apply_colours(colours: dict[str, str], mode: str) -> None:
             except BlockingIOError:
                 return
 
+            try:
+                cfg = json.loads(user_config_path.read_text())["theme"]
+            except (FileNotFoundError, json.JSONDecodeError, KeyError):
+                cfg = {}
+
             cfg = get_config().get("theme", {})
 
             def check(key: str) -> bool:
@@ -463,6 +470,7 @@ def apply_colours(colours: dict[str, str], mode: str) -> None:
             if check("enableCava"):
                 apply_cava(colours)
             apply_user_templates(colours, mode)
+
 
             if post_hook := cfg.get("postHook"):
                 scheme = get_scheme()
