@@ -4,6 +4,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+import shutil
+import fcntl
 from pathlib import Path
 
 from caelestia.utils.colour import get_dynamic_colours
