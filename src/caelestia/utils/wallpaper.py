@@ -2,6 +2,7 @@ import json
 import os
 import random
 import subprocess
+
 from argparse import Namespace
 from pathlib import Path
 from typing import cast
@@ -13,6 +14,7 @@ from PIL import Image
 from caelestia.utils.colourfulness import get_variant
 from caelestia.utils.hypr import message
 from caelestia.utils.material import get_colours_for_image
+from caelestia.utils.colourfulness import get_variant
 from caelestia.utils.paths import (
     compute_hash,
     get_config,
