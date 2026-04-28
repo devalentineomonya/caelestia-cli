@@ -7,6 +7,7 @@ from argparse import Namespace
 from datetime import datetime
 from pathlib import Path
 
+from caelestia.utils import hypr
 from caelestia.utils.notify import close_notification, notify
 from caelestia.utils.paths import (
     recording_notif_path,
