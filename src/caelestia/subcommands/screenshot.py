@@ -84,12 +84,19 @@ class Command:
             notify("Screenshot failed", "swappy not found")
 
     def fullscreen(self) -> None:
-        cmd = ["grim"]
-        focused_monitor = next(monitor for monitor in hypr.message("monitors") if monitor["focused"])
-        if focused_monitor:
-            cmd += ["-o", focused_monitor["name"]]
-        cmd += ["-"]
-        sc_data = subprocess.check_output(cmd)
+        log("fullscreen() called")
+        try:
+            sc_data = subprocess.check_output(["grim", "-"], stderr=subprocess.PIPE)
+            log(f"grim succeeded — {len(sc_data)} bytes")
+        except subprocess.CalledProcessError as e:
+            msg = e.stderr.decode().strip()
+            log(f"grim CalledProcessError: {msg}")
+            notify("Screenshot failed", f"grim error: {msg}")
+            return
+        except FileNotFoundError:
+            log("grim not found")
+            notify("Screenshot failed", "grim not found")
+            return
 
         subprocess.run(["wl-copy"], input=sc_data)
         dest = screenshots_cache_dir / datetime.now().strftime("%Y%m%d%H%M%S")
