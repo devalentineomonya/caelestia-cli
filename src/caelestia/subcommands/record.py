@@ -14,6 +14,7 @@ from caelestia.utils.paths import (
     recording_path,
     recordings_dir,
     user_config_path,
+    get_config,
 )
 
 RECORDER = "gpu-screen-recorder"
@@ -219,7 +220,7 @@ class Command:
         else:
             print("Recording without audio")
 
-        # --- Extra args from user config ---
+        config = get_config()
         try:
             config = json.loads(user_config_path.read_text())
             extra = config.get("record", {}).get("extraArgs", [])
