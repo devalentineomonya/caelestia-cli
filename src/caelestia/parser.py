@@ -1,9 +1,11 @@
 import argparse
 import sys
+import sys
 
 from caelestia.subcommands import (
     clipboard,
     emoji,
+    install,
     install,
     record,
     resizer,
