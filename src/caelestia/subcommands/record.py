@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -539,13 +540,19 @@ class Command:
             pass
 
         # Copy to clipboard if requested
-        if self.args.clipboard:
+        if getattr(self.args, "clipboard", False):
             file_uri = Path(new_path).resolve().as_uri() + "\n"
             subprocess.run(
                 ["wl-copy", "--type", "text/uri-list"], input=file_uri.encode()
             )
 
-        # Show completion notification and handle user action
+        # Fork a child to wait on the notification action so the terminal
+        # returns immediately instead of blocking until the user clicks.
+        pid = os.fork()
+        if pid != 0:
+            return  # parent: back to shell
+
+        os.setsid()  # detach child from terminal
         action = notify(
             "--action=watch=Watch",
             "--action=open=Open",
@@ -593,3 +600,5 @@ class Command:
             )
         except Exception as e:
             print(f"Could not show notification: {e}")
+
+        os._exit(0)
