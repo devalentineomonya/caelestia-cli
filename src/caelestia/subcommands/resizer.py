@@ -163,8 +163,7 @@ class Command:
                 for x in [monitor_height, monitor_width, monitor_scale, monitor_x, monitor_y]
             ):
                 return
-
-
+            
             monitor_height = monitor_height / monitor_scale
             monitor_width = monitor_width / monitor_scale
 
