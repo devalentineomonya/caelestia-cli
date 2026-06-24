@@ -23,7 +23,7 @@ The main control script for the Caelestia dotfiles.
 
 > [!NOTE]
 > For automatic Papirus folder icon color syncing, `papirus-folders` needs to be able to run with `sudo` without a password prompt.
-> 
+>
 > **Recommended** - Create a sudoers file:
 > ```fish
 > # Fish shell
@@ -35,7 +35,7 @@ The main control script for the Caelestia dotfiles.
 > echo "$USER ALL=(ALL) NOPASSWD: $(which papirus-folders)" | sudo tee /etc/sudoers.d/papirus-folders
 > sudo chmod 440 /etc/sudoers.d/papirus-folders
 > ```
-> 
+>
 > **Alternatively** - Edit the main sudoers file by running `sudo visudo` and adding at the end:
 > ```
 > your_username ALL=(ALL) NOPASSWD: /usr/bin/papirus-folders
@@ -103,6 +103,7 @@ e.g. via an AUR helper (yay)
 
 ```sh
 yay -S libnotify swappy grim dart-sass wl-clipboard slurp gpu-screen-recorder glib2 cliphist fuzzel python-build python-installer python-hatch python-hatch-vcs
+yay -S libnotify swappy grim dart-sass wl-clipboard slurp gpu-screen-recorder glib2 cliphist fuzzel python-build python-installer python-hatch python-hatch-vcs
 ```
 
 Now, clone the repo, `cd` into it, build the wheel via `python -m build --wheel`
@@ -116,6 +117,45 @@ cd cli
 python -m build --wheel
 sudo python -m installer dist/*.whl
 sudo cp completions/caelestia.fish /usr/share/fish/vendor_completions.d/caelestia.fish
+```
+
+### Additional steps
+
+#### Auto folder colour theming
+
+For automatic Papirus folder icon colour syncing, you must have [`papirus-folders`](https://github.com/PapirusDevelopmentTeam/papirus-folders)
+installed, and `papirus-folders` must to be able to run with `sudo` without a password prompt.
+
+You can allow this by creating a sudoers file:
+
+```sh
+echo "$USER ALL=(ALL) NOPASSWD: $(which papirus-folders)" | sudo tee /etc/sudoers.d/papirus-folders
+sudo chmod 440 /etc/sudoers.d/papirus-folders
+```
+
+#### Chromium-based browser theming
+
+For live Chromium-based browser theming, the CLI must be allowed to create certain directories in `/etc`
+and write to them via `sudo` without a password prompt.
+
+You can allow this by creating a sudoers file:
+
+```fish
+# Fish shell
+for dir in /etc/chromium/policies/managed /etc/brave/policies/managed /etc/opt/chrome/policies/managed
+    echo "$USER ALL=(ALL) NOPASSWD: $(which mkdir) -p $dir" | sudo tee -a /etc/sudoers.d/caelestia-chromium
+    echo "$USER ALL=(ALL) NOPASSWD: $(which tee) $dir/caelestia.json" | sudo tee -a /etc/sudoers.d/caelestia-chromium
+end
+sudo chmod 440 /etc/sudoers.d/caelestia-chromium
+```
+
+```sh
+# Bash/other shells
+for dir in /etc/chromium/policies/managed /etc/brave/policies/managed /etc/opt/chrome/policies/managed; do
+    echo "$USER ALL=(ALL) NOPASSWD: $(which mkdir) -p $dir" | sudo tee -a /etc/sudoers.d/caelestia-chromium
+    echo "$USER ALL=(ALL) NOPASSWD: $(which tee) $dir/caelestia.json" | sudo tee -a /etc/sudoers.d/caelestia-chromium
+done
+sudo chmod 440 /etc/sudoers.d/caelestia-chromium
 ```
 
 ### Additional steps
@@ -205,6 +245,27 @@ Custom user templates can be defined in `~/.config/caelestia/templates/`.
 - `{{ primary.rgb }}` outputs `rgb(193, 132, 207)`
 
 Output files are written to `~/.local/state/caelestia/theme/`. You can symlink them to your desired locations.
+    install      install the Caelestia dotfiles
+    update       update the Caelestia dotfiles
+```
+
+### User templates
+
+Custom user templates can be defined in `~/.config/caelestia/templates/`.
+
+#### Template syntax
+
+`{{ <color>.<format> }}`
+
+- `<color>` is a theme color role derived from the Material You color system (e.g. `primary`, `secondary`, `background`)
+- `<format>` is the output format: `hex` or `rgb`
+
+#### Examples
+
+- `{{ primary.hex }}` outputs `3f4ba2`
+- `{{ primary.rgb }}` outputs `rgb(193, 132, 207)`
+
+Output files are written to `~/.local/state/caelestia/theme/`. You can symlink them to your desired locations.
 
 ## Configuring
 
@@ -219,6 +280,7 @@ All configuration options are in `~/.config/caelestia/cli.json`.
     },
     "wallpaper": {
         "postHook": "echo $WALLPAPER_PATH $SCHEME_NAME $SCHEME_FLAVOUR $SCHEME_MODE $SCHEME_VARIANT $SCHEME_COLOURS"
+        "postHook": "echo $WALLPAPER_PATH $SCHEME_NAME $SCHEME_FLAVOUR $SCHEME_MODE $SCHEME_VARIANT $SCHEME_COLOURS"
     },
     "theme": {
         "enableTerm": true,
@@ -226,11 +288,23 @@ All configuration options are in `~/.config/caelestia/cli.json`.
         "enableDiscord": true,
         "enableSpicetify": true,
         "enablePandora": true,
+        "enablePandora": true,
         "enableFuzzel": true,
         "enableBtop": true,
         "enableNvtop": true,
         "enableHtop": true,
+        "enableNvtop": true,
+        "enableHtop": true,
         "enableGtk": true,
+        "enableQt": true,
+        "enableWarp": true,
+        "enableChromium": true,
+        "enableZed": true,
+        "enableCava": true,
+        "iconTheme": "Papirus-Dark",
+        "iconThemeLight": "Papirus-Light",
+        "iconThemeDark": "Papirus-Dark",
+        "postHook": "echo $SCHEME_NAME $SCHEME_FLAVOUR $SCHEME_MODE $SCHEME_VARIANT $SCHEME_COLOURS"
         "enableQt": true,
         "enableWarp": true,
         "enableChromium": true,
@@ -283,6 +357,10 @@ All configuration options are in `~/.config/caelestia/cli.json`.
                 "move": true
             }
         }
+    },
+    "dots": {
+        "url": "https://github.com/caelestia-dots/caelestia.git",
+        "branch": "main"
     },
     "dots": {
         "url": "https://github.com/caelestia-dots/caelestia.git",

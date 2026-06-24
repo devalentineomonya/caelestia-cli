@@ -1,11 +1,9 @@
 import argparse
 import sys
-import sys
 
 from caelestia.subcommands import (
     clipboard,
     emoji,
-    install,
     install,
     record,
     resizer,
@@ -25,13 +23,9 @@ from caelestia.utils.scheme import get_scheme_names, scheme_variants
 from caelestia.utils.wallpaper import get_wallpaper
 
 
-def parse_args() -> (argparse.ArgumentParser, argparse.Namespace):
-    parser = argparse.ArgumentParser(
-        prog="caelestia", description="Main control script for the Caelestia dotfiles"
-    )
-    parser.add_argument(
-        "-v", "--version", action="store_true", help="print the current version"
-    )
+def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
+    parser = argparse.ArgumentParser(prog="caelestia", description="Main control script for the Caelestia dotfiles")
+    parser.add_argument("-v", "--version", action="store_true", help="print the current version")
 
     # Add subcommand parsers
     command_parser = parser.add_subparsers(

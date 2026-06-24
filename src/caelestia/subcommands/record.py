@@ -178,6 +178,10 @@ class Command:
         video_mode = getattr(self.args, "mode", "fullscreen")
         audio_mode = getattr(self.args, "audio", None)
 
+        monitors = hypr.message("monitors")
+        if self.args.region:
+            if self.args.region == "slurp":
+                region = subprocess.check_output(["slurp", "-f", "%wx%h+%x+%y"], text=True)
         monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"]))
 
         # --- Video mode ---
@@ -215,20 +219,20 @@ class Command:
             print(f"Recording with audio: {audio_device} ({audio_mode})")
         elif getattr(self.args, "sound", False):
             args += ["-a", "default_output"]
-        else:
-            print("Recording without audio")
 
-        # --- Extra args from user config ---
+        config = get_config()
         try:
-            config = get_config()
             extra = config.get("record", {}).get("extraArgs", [])
             if not isinstance(extra, list):
                 raise ValueError("Config option 'record.extraArgs' must be an array")
             args += extra
         except FileNotFoundError:
             pass
+        except TypeError as e:
+            raise ValueError(f"Config option 'record.extraArgs' should be an array: {e}")
 
-        # --- Launch recorder ---
+        else:
+            print("Recording without audio")
         recording_path.parent.mkdir(parents=True, exist_ok=True)
         proc = subprocess.Popen(
             [RECORDER, *args, "-o", str(recording_path)], start_new_session=True
@@ -245,7 +249,7 @@ class Command:
                 notify(
                     "Recording failed",
                     "An error occurred attempting to start recorder. "
-                    f"Command `{' '.join(map(str, proc.args))}` failed with exit code {proc.returncode}",
+                        f"Command `{' '.join(proc.args)}` failed with exit code {proc.returncode}",
                 )
         except subprocess.TimeoutExpired:
             pass  # Still running — good
@@ -344,7 +348,7 @@ class Command:
                     "string:",
                 ]
             )
-            if p.returncode != 0:
+            if p.returncode != 0
                 subprocess.Popen(["xdg-open", new_path.parent], start_new_session=True)
         elif action == "delete":
             new_path.unlink()

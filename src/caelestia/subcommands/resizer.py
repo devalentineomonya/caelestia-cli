@@ -163,7 +163,7 @@ class Command:
                 for x in [monitor_height, monitor_width, monitor_scale, monitor_x, monitor_y]
             ):
                 return
-            
+
             monitor_height = monitor_height / monitor_scale
             monitor_width = monitor_width / monitor_scale
 
@@ -252,7 +252,6 @@ class Command:
             else:
                 window_id = event.split(">>")[1].split(",")[0]
 
-
             # Remove any leading > characters
             window_id = window_id.lstrip(">")
 
@@ -289,9 +288,7 @@ class Command:
             else:
                 data = event[12:]  # Remove "openwindow>>"
 
-
             window_id, workspace, window_class, title = data.split(",", 3)
-
 
             # Remove any leading > characters
             window_id = window_id.lstrip(">")
@@ -370,7 +367,6 @@ class Command:
             # Find all windows that match the pattern
             matching_windows = self._find_matching_windows(temp_rule)
 
-
             if not matching_windows:
                 warn(f"no windows found matching pattern '{temp_rule.name}' with match type '{temp_rule.match_type}'")
                 return
@@ -433,7 +429,6 @@ class Command:
 
                 window_title = window.get("title", "")
                 initial_title = window.get("initialTitle", "")
-
 
                 # Check if window matches the pattern
                 matches = False

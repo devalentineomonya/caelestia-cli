@@ -5,8 +5,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-import shutil
-import fcntl
 from pathlib import Path
 
 from caelestia.utils.colour import get_dynamic_colours
@@ -122,7 +120,6 @@ def gen_sequences(colours: dict[str, str]) -> str:
     )
 
 
-
 @log_exception
 def apply_terms(sequences: str) -> None:
     state = c_state_dir / "sequences.txt"
@@ -167,12 +164,6 @@ def apply_pandora(colours: dict[str, str], mode: str) -> None:
     template = gen_replace(colours, templates_dir / "pandora.json", hash=True)
     template = template.replace("{{ $mode }}", mode)
     atomic_write(data_dir / "PandoraLauncher/themes/caelestia.json", template)
-
-@log_exception
-def apply_pandora(colours: dict[str, str], mode: str) -> None:
-    template = gen_replace(colours, templates_dir / "pandora.json", hash=True)
-    template = template.replace("{{ $mode }}", mode)
-    write_file(data_dir / "PandoraLauncher/themes/caelestia.json", template)
 
 
 @log_exception
@@ -324,7 +315,10 @@ def apply_gtk(colours: dict[str, str], mode: str, icon_theme: str | None = None)
 
     subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/gtk-theme", "'adw-gtk3-dark'"])
     subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/color-scheme", f"'prefer-{mode}'"])
-    subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/icon-theme", f"'Papirus-{mode.capitalize()}'"])
+    gtk_icon_theme = icon_theme if icon_theme is not None else f"Papirus-{mode.capitalize()}"
+    subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/icon-theme", f"'{gtk_icon_theme}'"])
+
+    sync_papirus_colors(colours["primary"])
 
     gtk_icon_theme = icon_theme if icon_theme is not None else f"Papirus-{mode.capitalize()}"
     subprocess.run(["dconf", "write", "/org/gnome/desktop/interface/icon-theme", f"'{gtk_icon_theme}'"])
@@ -428,11 +422,6 @@ def apply_colours(colours: dict[str, str], mode: str) -> None:
             except BlockingIOError:
                 return
 
-            try:
-                cfg = json.loads(user_config_path.read_text())["theme"]
-            except (FileNotFoundError, json.JSONDecodeError, KeyError):
-                cfg = {}
-
             cfg = get_config().get("theme", {})
 
             def check(key: str) -> bool:
@@ -470,7 +459,6 @@ def apply_colours(colours: dict[str, str], mode: str) -> None:
             if check("enableCava"):
                 apply_cava(colours)
             apply_user_templates(colours, mode)
-
 
             if post_hook := cfg.get("postHook"):
                 scheme = get_scheme()
