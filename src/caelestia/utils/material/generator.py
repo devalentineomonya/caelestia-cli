@@ -13,22 +13,17 @@ from materialyoucolor.scheme.scheme_vibrant import SchemeVibrant
 from materialyoucolor.utils.math_utils import difference_degrees, rotation_direction, sanitize_degrees_double
 from typing import Protocol, Any
 
+# Import DynamicScheme before it's used in the Protocol
+try:
+    from materialyoucolor.dynamiccolor.dynamic_scheme import DynamicScheme
+except ImportError:
+    from materialyoucolor.scheme.dynamic_scheme import DynamicScheme
 
-# The base DynamicScheme class requires a 'variant' argument, but the specific
-# subclasses in get_scheme() handle that internally. This Protocol tells the type
-# checker to expect our specific 3-argument setup instead of the base class signature.
+# This Protocol tells the type checker to expect our specific 3‑argument setup
+# instead of the base class signature.
 class SchemeConstructor(Protocol):
-    def __call__(self, source_color_hct: Any, is_dark: bool, contrast_level: float) -> "DynamicScheme": ...
-
-try:
-    from materialyoucolor.dynamiccolor.dynamic_scheme import DynamicScheme
-except ImportError:
-    from materialyoucolor.scheme.dynamic_scheme import DynamicScheme
-
-try:
-    from materialyoucolor.dynamiccolor.dynamic_scheme import DynamicScheme
-except ImportError:
-    from materialyoucolor.scheme.dynamic_scheme import DynamicScheme
+    def __call__(self, source_color_hct: Any, is_dark: bool, contrast_level: float) -> DynamicScheme:
+        ...
 
 
 def hex_to_hct(hex: str) -> Hct:
@@ -251,7 +246,7 @@ def gen_scheme(scheme, primary: Hct) -> dict[str, str]:
     colours["mantle"] = darken(colours["surface"], 0.03)
     colours["crust"] = darken(colours["surface"], 0.05)
 
-    # More darkening if hard flavour
+    # More darkening if hard flavour (avoids re‑darkening surface0‑2 which were already done above)
     if scheme.flavour == "hard":
         for colour in "base", "mantle", "crust":
             colours[colour] = lighten(colours[colour], 0.4) if is_light else darken(colours[colour], 0.9)
@@ -259,9 +254,8 @@ def gen_scheme(scheme, primary: Hct) -> dict[str, str]:
             colours[f"overlay{i}"] = (
                 lighten(colours[f"overlay{i}"], 0.4) if is_light else darken(colours[f"overlay{i}"], 0.8)
             )
-            colours[f"surface{i}"] = (
-                lighten(colours[f"surface{i}"], 0.4) if is_light else darken(colours[f"surface{i}"], 0.8)
-            )
+            # surface0‑2 already darkened in the first hard block – skip to avoid duplication
+            # colours[f"surface{i}"] = ...
 
     # For debugging
     # print("\n".join(["{}: \x1b[48;2;{};{};{}m   \x1b[0m".format(n, *c.to_rgba()[:3]) for n, c in colours.items()]))
