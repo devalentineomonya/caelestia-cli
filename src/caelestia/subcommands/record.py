@@ -348,7 +348,7 @@ class Command:
                     "string:",
                 ]
             )
-            if p.returncode != 0
+            if p.returncode != 0:
                 subprocess.Popen(["xdg-open", new_path.parent], start_new_session=True)
         elif action == "delete":
             new_path.unlink()
